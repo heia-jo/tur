@@ -2,16 +2,69 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link href='https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.css' rel='stylesheet' />
-  <script src='https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.js'></script>
-  <title>Vite App</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0d1320" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="./public/vite.svg" />
+  <link rel="icon" type="image/svg+xml" href="./public/vite.svg" />
+  <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.css" />
+  <link rel="stylesheet" href="./style.css" />
+  <title>Town Tales — Audio Walking Guide</title>
 </head>
 <body>
-  <div id="turmap" style="width: 100%; height: 400px;"></div>
-  <!-- Ensure Mapbox GL JS is loaded before your main script -->
+  <main class="app-shell">
+    <header class="glass top-bar">
+      <div>
+        <p class="eyebrow">GPS walking companion</p>
+        <h1>Town Tales</h1>
+      </div>
+      <button id="locateBtn" class="glass-button">Locate me</button>
+    </header>
 
+    <section class="glass nav-hero" aria-live="polite">
+      <div class="ring-wrap">
+        <svg viewBox="0 0 120 120" class="progress-ring" aria-hidden="true">
+          <circle class="ring-bg" cx="60" cy="60" r="50"></circle>
+          <circle id="ringValue" class="ring-value" cx="60" cy="60" r="50"></circle>
+        </svg>
+        <div class="ring-center">
+          <span id="distanceValue">-- m</span>
+          <small>to next stop</small>
+        </div>
+      </div>
+      <div class="nav-meta">
+        <h2 id="activeStopTitle">Harbor Gateway</h2>
+        <p id="bearingValue">Bearing: --°</p>
+        <p id="gpsStatus">Waiting for GPS lock…</p>
+      </div>
+    </section>
+
+    <section class="glass map-pane" aria-label="Turn-by-turn map">
+      <div id="mapboxMap"></div>
+      <div class="instruction-pill glass" id="nextInstruction">Initializing route guidance…</div>
+    </section>
+
+    <section class="glass turn-sheet" aria-label="Route maneuvers">
+      <div class="sheet-header">
+        <h3>Turn-by-turn</h3>
+        <button id="refreshRouteBtn" class="glass-button">Refresh route</button>
+      </div>
+      <ol id="maneuverList" class="maneuvers"></ol>
+    </section>
+
+    <section class="glass stop-sheet" id="stopSheet">
+      <div class="sheet-grabber"></div>
+      <div class="sheet-header">
+        <h3>Stops</h3>
+        <button id="nextStopBtn" class="glass-button">Next stop</button>
+      </div>
+      <div id="stopCards" class="cards" role="list"></div>
+    </section>
+  </main>
+
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.js"></script>
   <script type="module" src="./main.js"></script>
 </body>
 </html>
