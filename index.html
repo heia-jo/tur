@@ -9,6 +9,7 @@
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="apple-touch-icon" href="./public/vite.svg" />
   <link rel="icon" type="image/svg+xml" href="./public/vite.svg" />
+  <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.css" />
   <link rel="stylesheet" href="./style.css" />
   <title>Town Tales — Audio Walking Guide</title>
 </head>
@@ -40,10 +41,17 @@
       </div>
     </section>
 
-    <section class="glass map-pane" aria-label="Tour map overview">
-      <div class="fake-map-grid"></div>
-      <div id="youMarker" class="marker you">You</div>
-      <div id="stopMarker" class="marker stop">Next</div>
+    <section class="glass map-pane" aria-label="Turn-by-turn map">
+      <div id="mapboxMap"></div>
+      <div class="instruction-pill glass" id="nextInstruction">Initializing route guidance…</div>
+    </section>
+
+    <section class="glass turn-sheet" aria-label="Route maneuvers">
+      <div class="sheet-header">
+        <h3>Turn-by-turn</h3>
+        <button id="refreshRouteBtn" class="glass-button">Refresh route</button>
+      </div>
+      <ol id="maneuverList" class="maneuvers"></ol>
     </section>
 
     <section class="glass stop-sheet" id="stopSheet">
@@ -56,6 +64,7 @@
     </section>
   </main>
 
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.2.0/mapbox-gl.js"></script>
   <script type="module" src="./main.js"></script>
 </body>
 </html>

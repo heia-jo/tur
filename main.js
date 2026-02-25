@@ -1,3 +1,5 @@
+import { mapboxAccessToken } from './config.js';
+
 const stops = [
   {
     name: 'Harbor Gateway',
@@ -21,6 +23,10 @@ const stops = [
 
 let activeIndex = 0;
 let userPos = null;
+let map;
+let userMarker;
+let stopMarker;
+let routeSteps = [];
 
 const distanceValue = document.querySelector('#distanceValue');
 const bearingValue = document.querySelector('#bearingValue');
@@ -30,8 +36,9 @@ const stopCards = document.querySelector('#stopCards');
 const ringValue = document.querySelector('#ringValue');
 const locateBtn = document.querySelector('#locateBtn');
 const nextStopBtn = document.querySelector('#nextStopBtn');
-const youMarker = document.querySelector('#youMarker');
-const stopMarker = document.querySelector('#stopMarker');
+const refreshRouteBtn = document.querySelector('#refreshRouteBtn');
+const nextInstruction = document.querySelector('#nextInstruction');
+const maneuverList = document.querySelector('#maneuverList');
 
 function haversineMeters(a, b) {
   const R = 6371000;
@@ -78,24 +85,128 @@ function renderCards() {
   });
 }
 
-function updateMapDots() {
-  if (!userPos) return;
-  const minLat = Math.min(...stops.map((s) => s.lat), userPos.lat);
-  const maxLat = Math.max(...stops.map((s) => s.lat), userPos.lat);
-  const minLng = Math.min(...stops.map((s) => s.lng), userPos.lng);
-  const maxLng = Math.max(...stops.map((s) => s.lng), userPos.lng);
-
-  const mapXY = ({ lat, lng }) => ({
-    x: ((lng - minLng) / (maxLng - minLng || 1)) * 80 + 10,
-    y: 90 - ((lat - minLat) / (maxLat - minLat || 1)) * 80,
+function initMap() {
+  mapboxgl.accessToken = mapboxAccessToken;
+  map = new mapboxgl.Map({
+    container: 'mapboxMap',
+    style: 'mapbox://styles/mapbox/standard',
+    center: [stops[0].lng, stops[0].lat],
+    zoom: 14,
+    pitch: 45,
+    bearing: 10,
   });
 
-  const you = mapXY(userPos);
-  const stop = mapXY(stops[activeIndex]);
-  youMarker.style.left = `${you.x}%`;
-  youMarker.style.top = `${you.y}%`;
-  stopMarker.style.left = `${stop.x}%`;
-  stopMarker.style.top = `${stop.y}%`;
+  map.addControl(new mapboxgl.NavigationControl({ showCompass: true }), 'top-right');
+
+  map.on('load', () => {
+    map.addSource('route', {
+      type: 'geojson',
+      data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: [] } },
+    });
+
+    map.addLayer({
+      id: 'route-line',
+      type: 'line',
+      source: 'route',
+      paint: {
+        'line-color': '#57ffa4',
+        'line-width': 7,
+        'line-opacity': 0.9,
+      },
+    });
+
+    stopMarker = new mapboxgl.Marker({ color: '#57ffa4' })
+      .setLngLat([stops[activeIndex].lng, stops[activeIndex].lat])
+      .addTo(map);
+  });
+}
+
+function setUserMarker() {
+  if (!map || !userPos) return;
+  if (!userMarker) {
+    userMarker = new mapboxgl.Marker({ color: '#7bb8ff' })
+      .setLngLat([userPos.lng, userPos.lat])
+      .addTo(map);
+  } else {
+    userMarker.setLngLat([userPos.lng, userPos.lat]);
+  }
+}
+
+function renderManeuvers(steps) {
+  maneuverList.innerHTML = '';
+  steps.forEach((step, i) => {
+    const li = document.createElement('li');
+    li.className = 'maneuver-item';
+    li.dataset.index = String(i);
+    li.innerHTML = `<strong>${step.maneuver.instruction}</strong><span>${Math.round(step.distance)} m</span>`;
+    maneuverList.append(li);
+  });
+}
+
+function highlightNearestStep() {
+  if (!userPos || !routeSteps.length) return;
+
+  let nearestIndex = 0;
+  let nearestDistance = Number.POSITIVE_INFINITY;
+
+  routeSteps.forEach((step, index) => {
+    const [lng, lat] = step.maneuver.location;
+    const distance = haversineMeters(userPos, { lat, lng });
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestIndex = index;
+    }
+  });
+
+  nextInstruction.textContent = routeSteps[nearestIndex]?.maneuver?.instruction || 'Continue to destination.';
+
+  maneuverList.querySelectorAll('.maneuver-item').forEach((item, idx) => {
+    item.classList.toggle('active', idx === nearestIndex);
+  });
+}
+
+async function buildRoute() {
+  if (!userPos || !map?.isStyleLoaded()) return;
+
+  const destination = stops[activeIndex];
+  const url = `https://api.mapbox.com/directions/v5/mapbox/walking/${userPos.lng},${userPos.lat};${destination.lng},${destination.lat}?steps=true&geometries=geojson&voice_instructions=true&banner_instructions=true&access_token=${mapboxAccessToken}`;
+
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+    const route = data?.routes?.[0];
+    if (!route) {
+      nextInstruction.textContent = 'Unable to generate walking route.';
+      return;
+    }
+    routeSteps = route.legs?.[0]?.steps || [];
+
+    const source = map.getSource('route');
+    if (source) {
+      source.setData({
+        type: 'Feature',
+        properties: {},
+        geometry: route.geometry,
+      });
+    }
+
+    if (stopMarker) {
+      stopMarker.setLngLat([destination.lng, destination.lat]);
+    }
+
+    map.fitBounds(
+      [
+        [userPos.lng, userPos.lat],
+        [destination.lng, destination.lat],
+      ],
+      { padding: 60, duration: 1200 },
+    );
+
+    renderManeuvers(routeSteps);
+    highlightNearestStep();
+  } catch {
+    nextInstruction.textContent = 'Route lookup failed. Check connection and retry.';
+  }
 }
 
 function refreshNav() {
@@ -111,14 +222,16 @@ function refreshNav() {
   const pct = Math.max(0, Math.min(1, 1 - dist / 800));
   ringValue.style.strokeDashoffset = String(314 - pct * 314);
 
-  gpsStatus.textContent = dist < 20 ? 'You are at this stop. Tap next for the following story.' : 'Turn your phone and follow the heading.';
+  gpsStatus.textContent = dist < 20 ? 'You are at this stop. Tap next for the following story.' : 'Follow live route guidance below.';
 
-  updateMapDots();
+  setUserMarker();
+  highlightNearestStep();
 }
 
 function nextStop() {
   activeIndex = (activeIndex + 1) % stops.length;
   refreshNav();
+  buildRoute();
 }
 
 function beginTracking() {
@@ -132,11 +245,13 @@ function beginTracking() {
       userPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
       gpsStatus.textContent = 'Live GPS connected.';
       refreshNav();
+      buildRoute();
     },
     () => {
       gpsStatus.textContent = 'Location permission denied. Using preview mode near downtown.';
       userPos = { lat: 58.7208, lng: 9.2355 };
       refreshNav();
+      buildRoute();
     },
     { enableHighAccuracy: true, maximumAge: 4000, timeout: 10000 },
   );
@@ -152,14 +267,17 @@ stopCards.addEventListener('click', (event) => {
   if (btn.dataset.act === 'activate') {
     activeIndex = index;
     refreshNav();
+    buildRoute();
     speak(`Now guiding to ${stops[index].name}.`);
   }
 });
 
 locateBtn.addEventListener('click', beginTracking);
 nextStopBtn.addEventListener('click', nextStop);
+refreshRouteBtn.addEventListener('click', buildRoute);
 
 renderCards();
+initMap();
 beginTracking();
 refreshNav();
 
