@@ -1,0 +1,17 @@
+{
+  "name": "Town Tales Audio Walk",
+  "short_name": "Town Tales",
+  "description": "A GPS-guided audio walking guide with immersive stop-by-stop narration.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0d1320",
+  "theme_color": "#0d1320",
+  "icons": [
+    {
+      "src": "./public/vite.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
